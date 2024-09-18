@@ -30,7 +30,6 @@ private:
 	void linkTopAndBot(node*&);
 	void newNextNode(node*&);
 	void newBottomNode(node*&);
-
 	void setStruct(int, int, char);
 
 public:
