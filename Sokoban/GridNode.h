@@ -25,12 +25,14 @@ class GridNode {
 private:
 	
 	node* head;
+	boxPlace* boxPlaces;
 	int size;
 
 	void linkTopAndBot(node*&);
 	void newNextNode(node*&);
 	void newBottomNode(node*&);
-	void setStruct(int, int, char);
+	void addBoxPlace(int, int, bool);
+	void clear();
 
 public:
 
@@ -38,9 +40,9 @@ public:
 	~GridNode();
 
 	char getStruct(int, int);
-	void loadLevel(int, boxPlace*&);
-	void movePlayer(char, boxPlace*&);
-	void printList(boxPlace*&);
+	bool checkBoxPlaces();
+	void loadLevel(int);
+	void movePlayer(char);
+	void printList();
+	void setBoxPlaceState(int, int, bool);
 };
-
-void setBoxPlaceState(int, int, bool, boxPlace*&);

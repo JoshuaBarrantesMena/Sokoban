@@ -7,7 +7,6 @@
 using namespace sf;
 
 void gameInit();
-bool checkBoxPlaces();
 
 void refreshMenu();
 void refreshKeyboardMenu(int&);
@@ -15,8 +14,10 @@ void refreshKeyboardMenu(int&);
 void refreshLevel();
 void refreshKeyboardLevel();
 
+void refreshPauseLevel();
+void refreshKeyboardPauseLevel(int&);
+
 void refreshLevelRecordMenu();
 void refreshLevelRecordKeyboardMenu(int&);
 
 void loopRefresh();
-

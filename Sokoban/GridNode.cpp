@@ -14,6 +14,57 @@ GridNode::GridNode(int pSize){
 }
 
 GridNode::~GridNode(){
+
+	node* currentNode = head;
+	node* bottomNode = head->bottom;
+	node* auxNode = head;
+
+	while (currentNode != nullptr) {
+		auxNode = currentNode;
+		while (auxNode != nullptr) {
+			node* deleteNode = auxNode;
+			auxNode = auxNode->next;
+			delete deleteNode;
+		}
+		currentNode = bottomNode;
+		if (bottomNode != nullptr) {
+			bottomNode = bottomNode->bottom;
+		}
+	}
+	boxPlace* currentBox = boxPlaces;
+
+	while (currentBox != nullptr) {
+
+		boxPlace* deleteBox = currentBox;
+		currentBox = currentBox->next;
+		delete deleteBox;
+	}
+}
+
+void GridNode::clear(){
+
+	node* currentNode = head;
+	node* auxNode = head;
+
+	while (currentNode != nullptr) {
+		auxNode = currentNode;
+		while (auxNode != nullptr) {
+			auxNode->character = '_';
+			auxNode = auxNode->next;
+		}
+		currentNode = currentNode->bottom;
+	}
+
+	boxPlace* currentBox = boxPlaces;
+	boxPlace* deleteBox;
+
+	while (currentBox != nullptr) {
+
+		deleteBox = currentBox;
+		currentBox = currentBox->next;
+		delete deleteBox;
+	}
+	boxPlaces = nullptr;
 }
 
 char GridNode::getStruct(int x, int y){
@@ -29,6 +80,26 @@ char GridNode::getStruct(int x, int y){
 		return '#';
 	}
 	return current->character;
+}
+
+bool GridNode::checkBoxPlaces() {
+
+	boxPlace* current = boxPlaces;
+
+	if (current == nullptr) {
+		return true;
+	}
+
+	int completes = 0, size = 0;
+
+	while (current != nullptr) {
+		if (current->isUsed) {
+			completes++;
+		}
+		current = current->next;
+		size++;
+	}
+	return completes == size;
 }
 
 void GridNode::linkTopAndBot(node*& top) {
@@ -115,21 +186,25 @@ void GridNode::newBottomNode(node*& current) {
 	}
 }
 
-void GridNode::setStruct(int x, int y, char structure){
+void GridNode::addBoxPlace(int x, int y, bool isUsed){
 
-	node* current = head;
-	while (current != nullptr && current->x != x) {
+	boxPlace* newPlace = new boxPlace(x, y, isUsed);
+
+	if (!boxPlaces) {
+		boxPlaces = newPlace;
+		return;
+	}
+	boxPlace* current = boxPlaces;
+
+	while (current->next != nullptr) {
 		current = current->next;
 	}
-	while (current != nullptr && current->y != y) {
-		current = current->bottom;
-	}
-	if (current != nullptr) {
-		current->character = structure;
-	}
+	current->next = newPlace;
 }
 
-void GridNode::loadLevel(int levelIndex, boxPlace*& boxPlaces) {
+void GridNode::loadLevel(int levelIndex) {
+
+	clear();
 
 	boxPlace* currentPlace = boxPlaces;
 	ifstream level;
@@ -151,26 +226,10 @@ void GridNode::loadLevel(int levelIndex, boxPlace*& boxPlaces) {
 			auxNode1->character = text[x];
 			auxNode1 = auxNode1->next;
 			if (text[x] == '.') {
-				boxPlace* newPlace = new boxPlace(x, y, false);
-				if (!boxPlaces) {
-					boxPlaces = newPlace;
-					currentPlace = boxPlaces;
-				}
-				else {
-					currentPlace->next = newPlace;
-					currentPlace = currentPlace->next;
-				}
+				addBoxPlace(x, y, false);
 			}
 			if (text[x] == '!') {
-				boxPlace* newPlace = new boxPlace(x, y, true);
-				if (!boxPlaces) {
-					boxPlaces = newPlace;
-					currentPlace = boxPlaces;
-				}
-				else {
-					currentPlace->next = newPlace;
-					currentPlace = currentPlace->next;
-				}
+				addBoxPlace(x, y, true);
 			}
 		}
 		auxNode2 = auxNode2->bottom;
@@ -180,7 +239,7 @@ void GridNode::loadLevel(int levelIndex, boxPlace*& boxPlaces) {
 	level.close();
 }
 
-void GridNode::movePlayer(char move, boxPlace*& list) {
+void GridNode::movePlayer(char move) {
 
 	node* currentNode = head;
 	node* auxNode = head;
@@ -207,9 +266,11 @@ void GridNode::movePlayer(char move, boxPlace*& list) {
 		if (currentNode->top != nullptr && currentNode->top->character != '#') {
 			if (currentNode->top->character == '$' || currentNode->top->character == '!'){
 
-				setBoxPlaceState(currentNode->top->x, currentNode->top->y, false, list);
+				if (currentNode->top->top != nullptr && currentNode->top->top->character != '#') {
+					setBoxPlaceState(currentNode->top->x, currentNode->top->y, false);
+				}
 				if (currentNode->top->top != nullptr && currentNode->top->top->character == '.') {
-					setBoxPlaceState(currentNode->top->top->x, currentNode->top->top->y, true, list);
+					setBoxPlaceState(currentNode->top->top->x, currentNode->top->top->y, true);
 					currentNode->top->top->character = '!';
 					currentNode->top->character = '@';
 					currentNode->character = '_';
@@ -230,9 +291,11 @@ void GridNode::movePlayer(char move, boxPlace*& list) {
 		if (currentNode->bottom != nullptr && currentNode->bottom->character != '#') {
 			if (currentNode->bottom->character == '$' || currentNode->bottom->character == '!'){
 
-				setBoxPlaceState(currentNode->bottom->x, currentNode->bottom->y, false, list);
+				if (currentNode->bottom->bottom != nullptr && currentNode->bottom->bottom->character != '#') {
+					setBoxPlaceState(currentNode->bottom->x, currentNode->bottom->y, false);
+				}
 				if (currentNode->bottom->bottom != nullptr && currentNode->bottom->bottom->character == '.') {
-					setBoxPlaceState(currentNode->bottom->bottom->x, currentNode->bottom->bottom->y, true, list);
+					setBoxPlaceState(currentNode->bottom->bottom->x, currentNode->bottom->bottom->y, true);
 					currentNode->bottom->bottom->character = '!';
 					currentNode->bottom->character = '@';
 					currentNode->character = '_';
@@ -253,9 +316,11 @@ void GridNode::movePlayer(char move, boxPlace*& list) {
 		if (currentNode->previous != nullptr && currentNode->previous->character != '#') {
 			if (currentNode->previous->character == '$' || currentNode->previous->character == '!'){
 
-				setBoxPlaceState(currentNode->previous->x, currentNode->previous->y, false, list);
+				if (currentNode->previous->previous != nullptr && currentNode->previous->previous->character != '#') {
+					setBoxPlaceState(currentNode->previous->x, currentNode->previous->y, false);
+				}
 				if (currentNode->previous->previous != nullptr && currentNode->previous->previous->character == '.') {
-					setBoxPlaceState(currentNode->previous->previous->x, currentNode->previous->previous->y, true, list);
+					setBoxPlaceState(currentNode->previous->previous->x, currentNode->previous->previous->y, true);
 					currentNode->previous->previous->character = '!';
 					currentNode->previous->character = '@';
 					currentNode->character = '_';
@@ -276,9 +341,11 @@ void GridNode::movePlayer(char move, boxPlace*& list) {
 		if (currentNode->next != nullptr && currentNode->next->character != '#') {
 			if (currentNode->next->character == '$' || currentNode->next->character == '!') {
 
-				setBoxPlaceState(currentNode->next->x, currentNode->next->y, false, list);
+				if (currentNode->next->next != nullptr && currentNode->next->next->character != '#') {
+					setBoxPlaceState(currentNode->next->x, currentNode->next->y, false);
+				}
 				if (currentNode->next->next != nullptr && currentNode->next->next->character == '.') {
-					setBoxPlaceState(currentNode->next->next->x, currentNode->next->next->y, true, list);
+					setBoxPlaceState(currentNode->next->next->x, currentNode->next->next->y, true);
 					currentNode->next->next->character = '!';
 					currentNode->next->character = '@';
 					currentNode->character = '_';
@@ -296,7 +363,7 @@ void GridNode::movePlayer(char move, boxPlace*& list) {
 		}
 		break;
 	}
-	boxPlace* current = list;
+	boxPlace* current = boxPlaces;
 	currentNode = head;
 	auxNode = head;
 
@@ -315,7 +382,7 @@ void GridNode::movePlayer(char move, boxPlace*& list) {
 	}
 }
 
-void GridNode:: printList(boxPlace*& list) {
+void GridNode:: printList() { //delete
 	
 	system("cls");
 
@@ -331,16 +398,16 @@ void GridNode:: printList(boxPlace*& list) {
 		currentNode = currentNode->bottom;
 	}
 
-	boxPlace* actual = list;
+	boxPlace* actual = boxPlaces;
 	while (actual != nullptr) {
 		cout << actual->x << ", " << actual->y << ", " << actual->isUsed << endl;
 		actual = actual->next;
 	}
 }
 
-void setBoxPlaceState(int x, int y, bool isUsed, boxPlace*& list){
+void GridNode::setBoxPlaceState(int x, int y, bool isUsed){
 
-	boxPlace* current = list;
+	boxPlace* current = boxPlaces;
 	while (current != nullptr) {
 		if (current->x == x && current->y == y) {
 			current->isUsed = isUsed;
