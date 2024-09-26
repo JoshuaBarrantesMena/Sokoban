@@ -5,7 +5,7 @@ GridNode::GridNode(int pSize){
 
 	head = nullptr;
 	this->size = pSize;
-	for (int i = 0; i < size; i++){
+	for (int i = 0; i <= size; i++){
 		newNextNode(head);
 	}
 	for (int i = 0; i < size; i++){
@@ -85,6 +85,10 @@ char GridNode::getStruct(int x, int y){
 bool GridNode::checkBoxPlaces() {
 
 	boxPlace* current = boxPlaces;
+
+	if (!current) {
+		return false;
+	}
 
 	if (current == nullptr) {
 		return true;
@@ -237,6 +241,70 @@ void GridNode::loadLevel(int levelIndex) {
 		y++;
 	}
 	level.close();
+	remove("levels/sl.txt");
+}
+
+void GridNode::loadSavedLevel(int& currentLevel){
+
+	clear();
+
+	boxPlace* currentPlace = boxPlaces;
+	ifstream level;
+	string text;
+	level.open("levels/sl.txt", ios::in);
+
+	if (level.fail()) {
+		currentLevel = 1;
+		loadLevel(currentLevel);
+		return;
+	}
+	node* auxNode1 = head;
+	node* auxNode2 = head;
+	int y = 0;
+
+	getline(level, text);
+	currentLevel = stoi(text);
+	while (!level.eof()) {
+
+		getline(level, text);
+		if (text.size() == 0) {
+			break;
+		}
+		for (int x = 0; x < text.size(); x++) {
+
+			auxNode1->character = text[x];
+			auxNode1 = auxNode1->next;
+			if (text[x] == '.') {
+				addBoxPlace(x, y, false);
+			}
+			if (text[x] == '!') {
+				addBoxPlace(x, y, true);
+			}
+		}
+		auxNode2 = auxNode2->bottom;
+		auxNode1 = auxNode2;
+		y++;
+	}
+	level.close();
+}
+
+void GridNode::saveLevel(int level){
+	
+	ofstream save("levels/sl.txt");
+	save << to_string(level) + "\n";
+
+	node* currentNode = head;
+	node* auxNode = head;
+	while (currentNode != nullptr) {
+		auxNode = currentNode;
+		while (auxNode != nullptr) {
+			save << auxNode->character;
+			auxNode = auxNode->next;
+		}
+		save << "\n";
+		currentNode = currentNode->bottom;
+	}
+	save.close();
 }
 
 void GridNode::movePlayer(char move) {
@@ -415,4 +483,17 @@ void GridNode::setBoxPlaceState(int x, int y, bool isUsed){
 		}
 		current = current->next;
 	}
+}
+
+boxPlace* GridNode::getBoxPlace(int pos){
+
+	boxPlace* current = boxPlaces;
+	int currentPos = 0;
+
+	while (current != nullptr && currentPos != pos) {
+		currentPos++;
+		current = current->next;
+	}
+
+	return current;
 }

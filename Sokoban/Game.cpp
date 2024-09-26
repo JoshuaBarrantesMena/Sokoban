@@ -5,8 +5,8 @@ RenderWindow gameWindow(VideoMode(640, 640), "Sokoban");
 Sprite Box, BoxLace, Brick, Floor, Player;
 Event gameEvent;
 RectangleShape fontImage, titleSQ, buttonSQ, pauseImage;
-Font gameFont, buttonFont, pauseFont;
-Text gameName, start, savedRepetitions, resume, reloadLevel, exitLevel, saveAndExit;
+Font gameFont, buttonFont, pauseFont, winFont;
+Text gameName, start, chargeGame, savedRepetitions, resume, reloadLevel, exitLevel, saveAndExit, win1, win2;
 
 GridNode gameGrid(10);
 
@@ -60,19 +60,25 @@ void gameInit() {
 	gameName.setCharacterSize(65);
 	gameName.setFillColor(Color(222, 214, 174));
 	gameName.setString("SOKOBAN");
-	gameName.setPosition(87, 128);
+	gameName.setPosition(86, 128);
 
 	start.setFont(buttonFont);
 	start.setCharacterSize(45);
 	start.setFillColor(Color(222, 214, 174));
 	start.setString("Empezar");
-	start.setPosition(220, 270);
+	start.setPosition(229, 270);
+
+	chargeGame.setFont(buttonFont);
+	chargeGame.setCharacterSize(45);
+	chargeGame.setFillColor(Color::White);
+	chargeGame.setString("Cargar Partida");
+	chargeGame.setPosition(157, 350);
 
 	savedRepetitions.setFont(buttonFont);
 	savedRepetitions.setCharacterSize(45);
 	savedRepetitions.setFillColor(Color::White);
 	savedRepetitions.setString("Historial");
-	savedRepetitions.setPosition(212, 350);
+	savedRepetitions.setPosition(221, 420);
 	//
 
 	// load pause
@@ -107,13 +113,34 @@ void gameInit() {
 	exitLevel.setPosition(459, 260);
 	//
 
+	// load win
+	winFont.loadFromFile("fonts/winFont.ttf");
+
+	win1.setFont(winFont);
+	win2.setFont(winFont);
+	win1.setCharacterSize(50);
+	win2.setCharacterSize(50);
+	win1.setFillColor(Color::White);
+	win1.setOutlineThickness(3);
+	win1.setOutlineColor(Color::Black);
+	win2.setFillColor(Color::White);
+	win2.setOutlineThickness(3);
+	win2.setOutlineColor(Color::Black);
+	win1.setString("Nivel 1");
+	win2.setString("Completado");
+	win1.setPosition(237, 220);
+	win2.setPosition(163, 275);
+
+	
+	//
+
 	currentLevel = 1;
 	levelLoaded = false;
 	paused = false;
 
 	isUp = false, isDown = false, isLeft = false, isRight = false, isPausedKey = false, isEnter = false;
 
-	int menu = 0;
+	int menu = 0, time = 0;
 	selectedMenuOption = 0, selectedPauseOption = 0;
 	
 	while (gameWindow.isOpen()) {
@@ -127,27 +154,33 @@ void gameInit() {
 
 		//startgame menu
 		if (menu == 1) {
-			if (!levelLoaded) {
+			if (!levelLoaded) { //load level
 				gameGrid.loadLevel(currentLevel);
 				levelLoaded = true;
 			}
-			if (gameGrid.checkBoxPlaces()) {
-				cout << "Nivel #" << currentLevel << " ganado" << endl; //delete
-				//cargar siguiente nivel
-				//limpiar matriz del nivel
-				//limpiar lista de puntos de cajas
-				//aumentar el nuvel actual en 1
+
+			refreshLevel(); //refresh window;
+			refreshPauseLevel();
+			this_thread::sleep_for(chrono::milliseconds(25));
+
+			if (!gameGrid.checkBoxPlaces()) { //if game is no winned
+				refreshKeyboardPauseLevel(menu);
+				refreshKeyboardLevel();
 			}
-			refreshKeyboardLevel();
-			refreshKeyboardPauseLevel(menu);
-			if (menu == 1) {
-				refreshLevel();
-				refreshPauseLevel();
+			else { // if game is winned
+				refreshWinLevel(time);
+				refreshKeyboardWinLevel();
 			}
 		}
 
+		if (menu == 2) {
+			gameGrid.loadSavedLevel(currentLevel);
+			levelLoaded = true;
+			menu = 1;
+		}
+
 		//saved records menu
- 		if (menu == 2) {
+ 		if (menu == 3) {
 
 			refreshLevelRecordKeyboardMenu(menu);
 			refreshLevelRecordMenu();
@@ -155,7 +188,6 @@ void gameInit() {
 
 		gameWindow.display();
 		loopRefresh();
-		this_thread::sleep_for(chrono::milliseconds(25));
 	}
 }
 
@@ -174,7 +206,7 @@ void refreshKeyboardMenu(int& menu) {
 
 	if ((Keyboard::isKeyPressed(Keyboard::Down) || Keyboard::isKeyPressed(Keyboard::S)) && !isDown) {
 		selectedMenuOption++;
-		if (selectedMenuOption > 1) {
+		if (selectedMenuOption > 2) {
 			selectedMenuOption--;
 		}
 		isDown = true;
@@ -192,7 +224,10 @@ void refreshKeyboardMenu(int& menu) {
 		case 1:
 			menu = 2;
 			break;
+		case 2:
+			menu = 3;
 		}
+		isEnter = true;
 	}
 	if (!(Keyboard::isKeyPressed(Keyboard::Enter))) {
 		isEnter = false;
@@ -229,6 +264,7 @@ void refreshLevel(){
 			case '$':
 				Floor.setPosition(j * 64, i * 64);
 				gameWindow.draw(Floor);
+				Box.setColor(Color(255, 255, 255, 255));
 				Box.setPosition(j * 64, i * 64);
 				gameWindow.draw(Box);
 				break;
@@ -236,9 +272,9 @@ void refreshLevel(){
 				Floor.setPosition(j * 64, i * 64);
 				gameWindow.draw(Floor);
 				Box.setPosition(j * 64, i * 64);
-				Box.setColor(Color(Box.getColor().r - 100, Box.getColor().g - 100, Box.getColor().b - 100, 255));
+				Box.setColor(Color(155, 155, 155, 255));
 				gameWindow.draw(Box);
-				Box.setColor(Color(Box.getColor().r + 100, Box.getColor().g + 100, Box.getColor().b + 100, 255));
+				Box.setColor(Color(255, 255, 255, 255));
 				break;
 			}
 		}
@@ -376,24 +412,73 @@ void refreshKeyboardPauseLevel(int& menu) {
 			isEnter = true;
 			switch (selectedPauseOption){
 			default:
-				paused = false;
 				break;
 			case 1:
-				paused = false;
 				levelLoaded = false;
 				break;
 			case 2:
+				menu = 0;
+				gameGrid.saveLevel(currentLevel);
+				levelLoaded = false;
 				break;
 			case 3:
-				selectedPauseOption = 0;
 				levelLoaded = false;
 				menu = 0;
 				break;
 			}
+			paused = false;
+			selectedPauseOption = 0;
+			selectedMenuOption = 0;
 		}
 		if (!(Keyboard::isKeyPressed(Keyboard::Enter))) {
 			isEnter = false;
 		}
+	}
+}
+
+void refreshWinLevel(int& time){
+
+	boxPlace* box;
+	int pos = 0;
+
+	if (time < 12) {
+		Box.setColor(Color(255, 255, 55, 255));
+
+		win1.setOutlineColor(Color::Black);
+		win1.setFillColor(Color::White);
+		win2.setOutlineColor(Color::Black);
+		win2.setFillColor(Color::White);
+	}
+	else{
+		Box.setColor(Color(155, 155, 155, 255));
+
+		win1.setOutlineColor(Color::White);
+		win1.setFillColor(Color::Black);
+		win2.setOutlineColor(Color::White);
+		win2.setFillColor(Color::Black);
+	}
+	if (time == 25) {
+		time = 0;
+	}
+
+	while ((box = gameGrid.getBoxPlace(pos)) != nullptr) {
+		Box.setPosition(box->x * 64, box->y * 64);
+		gameWindow.draw(Box);
+		pos++;
+	}
+	time++;
+	String level = "Nivel ";
+	level += to_string(currentLevel);
+	win1.setString(level);
+	gameWindow.draw(win1);
+	gameWindow.draw(win2);
+}
+
+void refreshKeyboardWinLevel(){
+
+	if (Keyboard::isKeyPressed(Keyboard::Enter)) {
+		currentLevel++;
+		levelLoaded = false;
 	}
 }
 
@@ -407,19 +492,30 @@ void refreshMenu() {
 
 	gameWindow.draw(titleSQ);
 	gameWindow.draw(gameName);
-
-	if (selectedMenuOption == 0) {
+	switch (selectedMenuOption) {
+	default:
 		start.setFillColor(Color(222, 214, 174));
+		chargeGame.setFillColor(Color::White);
 		savedRepetitions.setFillColor(Color::White);
 		buttonSQ.setPosition(gameWindow.getSize().x / 2 - buttonSQ.getSize().x / 2, 269);
-	}
-	else {
+		break;
+	case 1:
 		start.setFillColor(Color::White);
-		savedRepetitions.setFillColor(Color(222, 214, 174));
+		chargeGame.setFillColor(Color(222, 214, 174));
+		savedRepetitions.setFillColor(Color::White);
 		buttonSQ.setPosition(gameWindow.getSize().x / 2 - buttonSQ.getSize().x / 2, 349);
+		break;
+	case 2:
+		start.setFillColor(Color::White);
+		chargeGame.setFillColor(Color::White);
+		savedRepetitions.setFillColor(Color(222, 214, 174));
+		buttonSQ.setPosition(gameWindow.getSize().x / 2 - buttonSQ.getSize().x / 2, 419);
+		break;
 	}
+
 	gameWindow.draw(buttonSQ);
 	gameWindow.draw(start);
+	gameWindow.draw(chargeGame);
 	gameWindow.draw(savedRepetitions);
 }
 

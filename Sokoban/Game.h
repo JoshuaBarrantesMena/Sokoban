@@ -17,6 +17,9 @@ void refreshKeyboardLevel();
 void refreshPauseLevel();
 void refreshKeyboardPauseLevel(int&);
 
+void refreshWinLevel(int&);
+void refreshKeyboardWinLevel();
+
 void refreshLevelRecordMenu();
 void refreshLevelRecordKeyboardMenu(int&);
 

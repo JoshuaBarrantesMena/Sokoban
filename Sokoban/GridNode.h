@@ -42,7 +42,10 @@ public:
 	char getStruct(int, int);
 	bool checkBoxPlaces();
 	void loadLevel(int);
+	void loadSavedLevel(int&);
+	void saveLevel(int);
 	void movePlayer(char);
 	void printList();
 	void setBoxPlaceState(int, int, bool);
+	boxPlace* getBoxPlace(int);
 };
