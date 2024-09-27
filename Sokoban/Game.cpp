@@ -6,14 +6,16 @@ Sprite Box, BoxLace, Brick, Floor, Player;
 Event gameEvent;
 RectangleShape fontImage, titleSQ, buttonSQ, pauseImage;
 Font gameFont, buttonFont, pauseFont, winFont;
-Text gameName, start, chargeGame, savedRepetitions, resume, reloadLevel, exitLevel, saveAndExit, win1, win2;
+Text gameName, start, chargeGame, record, resume, reloadLevel, exitLevel, saveAndExit, win1, win2;
+Text savedRecords, recName, recLevel;
 
 GridNode gameGrid(10);
+vector<Texture> Replay;
 
-int selectedMenuOption, selectedPauseOption;
+int selectedMenuOption, selectedPauseOption, selectedReplay;
 int currentLevel;
-bool levelLoaded, paused;
-bool isUp, isDown, isLeft, isRight, isPausedKey, isEnter;
+bool levelLoaded, paused, levelReset, playerMoved, ingame, recordLoaded;
+bool isUp, isDown, isLeft, isRight, isPausedKey, isEnter, isDeleteKey;
 
 void gameInit() {
 
@@ -74,11 +76,11 @@ void gameInit() {
 	chargeGame.setString("Cargar Partida");
 	chargeGame.setPosition(157, 350);
 
-	savedRepetitions.setFont(buttonFont);
-	savedRepetitions.setCharacterSize(45);
-	savedRepetitions.setFillColor(Color::White);
-	savedRepetitions.setString("Historial");
-	savedRepetitions.setPosition(221, 420);
+	record.setFont(buttonFont);
+	record.setCharacterSize(45);
+	record.setFillColor(Color::White);
+	record.setString("Historial");
+	record.setPosition(221, 420);
 	//
 
 	// load pause
@@ -130,21 +132,38 @@ void gameInit() {
 	win2.setString("Completado");
 	win1.setPosition(237, 220);
 	win2.setPosition(163, 275);
+	//
 
-	
+	//records
+	savedRecords.setFont(pauseFont);
+	savedRecords.setCharacterSize(45);
+	savedRecords.setOutlineThickness(2);
+	savedRecords.setFillColor(Color::White);
+	savedRecords.setString("Repeticiones guardadas");
+	savedRecords.setPosition(65, 40);
+
+	recName.setFont(pauseFont);
+	recName.setCharacterSize(30);
+	recName.setFillColor(Color::White);
+
+	recLevel.setFont(pauseFont);
+	recLevel.setCharacterSize(20);
+	recLevel.setFillColor(Color(222, 214, 174));
 	//
 
 	currentLevel = 1;
 	levelLoaded = false;
 	paused = false;
+	levelReset = false;
+	playerMoved = true;
 
-	isUp = false, isDown = false, isLeft = false, isRight = false, isPausedKey = false, isEnter = false;
+	isUp = false, isDown = false, isLeft = false, isRight = false, isPausedKey = false, isEnter = false, isDeleteKey = false;
 
-	int menu = 0, time = 0;
-	selectedMenuOption = 0, selectedPauseOption = 0;
+	int menu = 0, time = 0, currentReplay = 0, currentFrame = 0, currentVecFrame = 1;
+	selectedMenuOption = 0, selectedPauseOption = 0, selectedReplay = 0;
 	
 	while (gameWindow.isOpen()) {
-
+		ingame = false;
 		//principal menu
 		if (menu == 0) {
 
@@ -152,29 +171,43 @@ void gameInit() {
 			refreshMenu();
 		}
 
+		//win screen
+		if (currentLevel >= 6) {
+			gameGrid.loadLevel(currentLevel);
+			gameWinned();
+			menu = 0;
+			currentLevel = 1;
+			paused = false;
+			selectedMenuOption = 0;
+		}
 		//startgame menu
 		if (menu == 1) {
+			ingame = true;
 			if (!levelLoaded) { //load level
 				gameGrid.loadLevel(currentLevel);
 				levelLoaded = true;
+				if (!levelReset) {
+					currentReplay = localReplay();
+					levelReset = true;
+				}
 			}
 
-			refreshLevel(); //refresh window;
+			refreshLevel(currentReplay, currentFrame); //refresh window;
 			refreshPauseLevel();
 			this_thread::sleep_for(chrono::milliseconds(25));
 
 			if (!gameGrid.checkBoxPlaces()) { //if game is no winned
-				refreshKeyboardPauseLevel(menu);
+				refreshKeyboardPauseLevel(menu, currentReplay, currentFrame);
 				refreshKeyboardLevel();
 			}
 			else { // if game is winned
 				refreshWinLevel(time);
-				refreshKeyboardWinLevel();
+				refreshKeyboardWinLevel(currentFrame);
 			}
 		}
 
 		if (menu == 2) {
-			gameGrid.loadSavedLevel(currentLevel);
+			gameGrid.loadSavedLevel(currentLevel, currentReplay, currentFrame);
 			levelLoaded = true;
 			menu = 1;
 		}
@@ -182,12 +215,20 @@ void gameInit() {
 		//saved records menu
  		if (menu == 3) {
 
-			refreshLevelRecordKeyboardMenu(menu);
 			refreshLevelRecordMenu();
+			refreshLevelRecordKeyboardMenu(menu);
+
+			if (recordLoaded) {
+				refreshKeyboardRecord(currentVecFrame);
+				refreshRecord(currentVecFrame);
+			}
 		}
 
 		gameWindow.display();
 		loopRefresh();
+	}
+	if (ingame) { //if window closed while is playing a level
+		deleteReplays(1, currentReplay, true);
 	}
 }
 
@@ -234,7 +275,7 @@ void refreshKeyboardMenu(int& menu) {
 	}
 }
 
-void refreshLevel(){
+void refreshLevel(int currentReplay, int& currentFrame){
 
 	gameWindow.draw(fontImage);
 
@@ -279,6 +320,11 @@ void refreshLevel(){
 			}
 		}
 	}
+	if (playerMoved) {
+		makeReplay(currentReplay, currentFrame);
+		currentFrame++;
+		playerMoved = false;
+	}
 }
 
 void refreshKeyboardLevel(){
@@ -286,10 +332,9 @@ void refreshKeyboardLevel(){
 	if (!paused) {
 		//up
 		if ((Keyboard::isKeyPressed(Keyboard::Up) || Keyboard::isKeyPressed(Keyboard::W)) && !isUp) {
-			cout << "Up\n";
 			gameGrid.movePlayer('w');
 			isUp = true;
-			gameGrid.printList(); //delete
+			playerMoved = true;
 		}
 		if (!(Keyboard::isKeyPressed(Keyboard::Up) || Keyboard::isKeyPressed(Keyboard::W))) {
 			isUp = false;
@@ -297,10 +342,9 @@ void refreshKeyboardLevel(){
 
 		//down
 		if ((Keyboard::isKeyPressed(Keyboard::Down) || Keyboard::isKeyPressed(Keyboard::S)) && !isDown) {
-			cout << "Down\n";
 			gameGrid.movePlayer('s');
 			isDown = true;
-			gameGrid.printList(); //delete
+			playerMoved = true;
 		}
 		if (!(Keyboard::isKeyPressed(Keyboard::Down) || Keyboard::isKeyPressed(Keyboard::S))) {
 			isDown = false;
@@ -308,10 +352,9 @@ void refreshKeyboardLevel(){
 
 		//left
 		if ((Keyboard::isKeyPressed(Keyboard::Left) || Keyboard::isKeyPressed(Keyboard::A)) && !isLeft) {
-			cout << "Left\n";
 			gameGrid.movePlayer('a');
 			isLeft = true;
-			gameGrid.printList(); //delete
+			playerMoved = true;
 		}
 		if (!(Keyboard::isKeyPressed(Keyboard::Left) || Keyboard::isKeyPressed(Keyboard::A))) {
 			isLeft = false;
@@ -319,10 +362,9 @@ void refreshKeyboardLevel(){
 
 		//right
 		if ((Keyboard::isKeyPressed(Keyboard::Right) || Keyboard::isKeyPressed(Keyboard::D)) && !isRight) {
-			cout << "Right\n";
 			gameGrid.movePlayer('d');
 			isRight = true;
-			gameGrid.printList(); //delete
+			playerMoved = true;
 		}
 		if (!(Keyboard::isKeyPressed(Keyboard::Right) || Keyboard::isKeyPressed(Keyboard::D))) {
 			isRight = false;
@@ -331,7 +373,6 @@ void refreshKeyboardLevel(){
 
 	//escape
 	if ((Keyboard::isKeyPressed(Keyboard::Escape) || Keyboard::isKeyPressed(Keyboard::Q)) && !isPausedKey) {
-		cout << "Pause\n";
 		isPausedKey = true;
 		if (paused) {
 			paused = false;
@@ -379,12 +420,11 @@ void refreshPauseLevel() {
 	}
 }
 
-void refreshKeyboardPauseLevel(int& menu) {
+void refreshKeyboardPauseLevel(int& menu, int& currentReplay, int& currentFrame) {
 
 	if (paused) {
 		//up
 		if ((Keyboard::isKeyPressed(Keyboard::Up) || Keyboard::isKeyPressed(Keyboard::W)) && !isUp) {
-			cout << "Up\n";
 			if ((selectedPauseOption - 1) >= 0) {
 				selectedPauseOption--;
 			}
@@ -396,7 +436,6 @@ void refreshKeyboardPauseLevel(int& menu) {
 
 		//down
 		if ((Keyboard::isKeyPressed(Keyboard::Down) || Keyboard::isKeyPressed(Keyboard::S)) && !isDown) {
-			cout << "Down\n";
 			if ((selectedPauseOption + 1) <= 3) {
 				selectedPauseOption++;
 			}
@@ -408,20 +447,25 @@ void refreshKeyboardPauseLevel(int& menu) {
 
 		//enter
 		if (Keyboard::isKeyPressed(Keyboard::Enter) && !isEnter) {
-			cout << "Enter\n";
 			isEnter = true;
 			switch (selectedPauseOption){
 			default:
 				break;
 			case 1:
+				deleteReplays(currentLevel, currentReplay, false);
+				currentFrame = 1;
+				levelReset = true;
 				levelLoaded = false;
 				break;
 			case 2:
 				menu = 0;
-				gameGrid.saveLevel(currentLevel);
+				gameGrid.saveLevel(currentLevel, currentReplay, currentFrame);
 				levelLoaded = false;
 				break;
 			case 3:
+				deleteReplays(1, currentReplay, true);
+				currentFrame = 0;
+				playerMoved = true;
 				levelLoaded = false;
 				menu = 0;
 				break;
@@ -474,11 +518,17 @@ void refreshWinLevel(int& time){
 	gameWindow.draw(win2);
 }
 
-void refreshKeyboardWinLevel(){
+void refreshKeyboardWinLevel(int& currentFrame){
 
-	if (Keyboard::isKeyPressed(Keyboard::Enter)) {
+	if (Keyboard::isKeyPressed(Keyboard::Enter) && !isEnter) {
 		currentLevel++;
+		currentFrame = 0;
+		playerMoved = true;
 		levelLoaded = false;
+		isEnter = true;
+	}
+	if (!(Keyboard::isKeyPressed(Keyboard::Enter))) {
+		isEnter = false;
 	}
 }
 
@@ -496,19 +546,19 @@ void refreshMenu() {
 	default:
 		start.setFillColor(Color(222, 214, 174));
 		chargeGame.setFillColor(Color::White);
-		savedRepetitions.setFillColor(Color::White);
+		record.setFillColor(Color::White);
 		buttonSQ.setPosition(gameWindow.getSize().x / 2 - buttonSQ.getSize().x / 2, 269);
 		break;
 	case 1:
 		start.setFillColor(Color::White);
 		chargeGame.setFillColor(Color(222, 214, 174));
-		savedRepetitions.setFillColor(Color::White);
+		record.setFillColor(Color::White);
 		buttonSQ.setPosition(gameWindow.getSize().x / 2 - buttonSQ.getSize().x / 2, 349);
 		break;
 	case 2:
 		start.setFillColor(Color::White);
 		chargeGame.setFillColor(Color::White);
-		savedRepetitions.setFillColor(Color(222, 214, 174));
+		record.setFillColor(Color(222, 214, 174));
 		buttonSQ.setPosition(gameWindow.getSize().x / 2 - buttonSQ.getSize().x / 2, 419);
 		break;
 	}
@@ -516,16 +566,268 @@ void refreshMenu() {
 	gameWindow.draw(buttonSQ);
 	gameWindow.draw(start);
 	gameWindow.draw(chargeGame);
-	gameWindow.draw(savedRepetitions);
+	gameWindow.draw(record);
 }
 
 void refreshLevelRecordMenu() {
 	gameWindow.draw(fontImage);
+	gameWindow.draw(savedRecords);
+
+	buttonSQ.setOutlineThickness(0);
+	buttonSQ.setFillColor(Color::White);
+	buttonSQ.setSize(Vector2f(360, 60));
+
+	ifstream file;
+	int y = 150;
+
+	for (int i = 1; i <= 5; i++) {
+		recLevel.setString("");
+		file.open("replays/replay" + to_string(i) + "/l1f0.jpg");
+		if (file.is_open()) {
+			recName.setString("repeticion guardada " + to_string(i));
+			for (int j = 1; j <= 5; j++) {
+				file.close();
+				file.open("replays/replay" + to_string(i) + "/l" + to_string(j) + "f0.jpg");
+				if (file.is_open()) {
+					recLevel.setString("nivel: " + to_string(j));
+				}
+			}
+		}
+		else {
+			recName.setString("vacio");
+		}
+		recName.setPosition(40, y);
+		recLevel.setPosition(50, y + 30);
+		y += 90;
+
+		if (selectedReplay == i - 1) {
+			buttonSQ.setPosition(30, 150 + (i - 1)*90);
+			recName.setFillColor(Color(222, 214, 174));
+			gameWindow.draw(buttonSQ);
+		}
+		else {
+			recName.setFillColor(Color::White);
+		}
+
+		gameWindow.draw(recName);
+		gameWindow.draw(recLevel);
+		file.close();
+	}
 }
 
 void refreshLevelRecordKeyboardMenu(int& menu) {
+	
+	if ((Keyboard::isKeyPressed(Keyboard::Up) || Keyboard::isKeyPressed(Keyboard::W)) && !isUp) {
+		selectedReplay--;
+		if (selectedReplay < 0) {
+			selectedReplay++;
+		}
+		isUp = true;
+	}
+	if (!(Keyboard::isKeyPressed(Keyboard::Up) || Keyboard::isKeyPressed(Keyboard::W))) {
+		isUp = false;
+	}
+
+	if ((Keyboard::isKeyPressed(Keyboard::Down) || Keyboard::isKeyPressed(Keyboard::S)) && !isDown) {
+		selectedReplay++;
+		if (selectedReplay > 4) {
+			selectedReplay--;
+		}
+		isDown = true;
+	}
+	if (!(Keyboard::isKeyPressed(Keyboard::Down) || Keyboard::isKeyPressed(Keyboard::S))) {
+		isDown = false;
+	}
+	
 	if (Keyboard::isKeyPressed(Keyboard::Escape)) {
 		menu = 0;
+		selectedReplay = 0;
+	}
+
+	if (Keyboard::isKeyPressed(Keyboard::Enter) && !isEnter) {
+		Replay.clear();
+		loadingRecordScreen();
+		chargeReplay(selectedReplay + 1);
+		recordLoaded = true;
+		isEnter = true;
+	}
+	if (!Keyboard::isKeyPressed(Keyboard::Enter)) {
+		isEnter = false;
+	}
+
+	if (Keyboard::isKeyPressed(Keyboard::E) && !isDeleteKey) {
+		deleteReplays(1, selectedReplay + 1, true);
+		isDeleteKey = true;
+	}
+	if (!(Keyboard::isKeyPressed(Keyboard::E))) {
+		isDeleteKey = false;
+	}
+}
+
+void refreshRecord(int& currentFrame){
+
+	if (Replay.size() <= currentFrame) {
+		recordLoaded = false;
+		currentFrame = 1;
+		return;
+	}
+
+	Sprite currentSprite;
+	currentSprite.setTexture(Replay.at(currentFrame));
+	gameWindow.draw(currentSprite);
+}
+
+void refreshKeyboardRecord(int& currentFrame){
+	//left
+	if ((Keyboard::isKeyPressed(Keyboard::Left) || Keyboard::isKeyPressed(Keyboard::A)) && !isLeft) {
+		currentFrame--;
+		if (currentFrame < 0) {
+			currentFrame++;
+		}
+		isLeft = true;
+	}
+	if (!(Keyboard::isKeyPressed(Keyboard::Left) || Keyboard::isKeyPressed(Keyboard::A))) {
+		isLeft = false;
+	}
+
+	//right
+	if ((Keyboard::isKeyPressed(Keyboard::Right) || Keyboard::isKeyPressed(Keyboard::D) || Keyboard::isKeyPressed(Keyboard::Space)) && !isRight) {
+		currentFrame++;
+		isRight = true;
+	}
+	if (!(Keyboard::isKeyPressed(Keyboard::Right) || Keyboard::isKeyPressed(Keyboard::D) || Keyboard::isKeyPressed(Keyboard::Space))) {
+		isRight = false;
+	}
+}
+
+int localReplay(){
+
+	int current = 1;
+	string directory = "replays/replay" + to_string(current) + "/l1f0.jpg";
+
+	ifstream replay;
+	replay.open(directory);
+	
+	while (replay.is_open()) {
+		replay.close();
+		current++;
+		directory = "replays/replay" + to_string(current) + "/l1f0.jpg";
+		replay.open(directory);
+	}
+	replay.close();
+	return current;
+}
+
+void makeReplay(int currentReplay, int currentFrame){
+
+	Texture texture;
+	texture.create(gameWindow.getSize().x, gameWindow.getSize().y);
+	texture.update(gameWindow);
+
+	Image screenshot = texture.copyToImage();
+
+	string fileName = "replays/replay" + to_string(currentReplay) + "/l" + to_string(currentLevel) + "f" + to_string(currentFrame) + ".jpg";
+	screenshot.saveToFile(fileName);
+}
+
+void deleteReplays(int level, int currentReplay, bool deleteAll){
+
+	int frame = 0;
+	string directory = "replays/replay" + to_string(currentReplay) + "/l" + to_string(level) + "f" + to_string(frame) + ".jpg";
+	ifstream file;
+	file.open(directory);
+	if (file.is_open() && !deleteAll) {
+		file.close();
+		frame++;
+		directory = "replays/replay" + to_string(currentReplay) + "/l" + to_string(level) + "f" + to_string(frame) + ".jpg";
+		file.open(directory);
+	}
+
+	while (file.is_open()) {
+		file.close();
+		remove(directory.c_str());
+		frame++;
+		directory = "replays/replay" + to_string(currentReplay) + "/l" + to_string(level) + "f" + to_string(frame) + ".jpg";
+		file.open(directory);
+		if (!file.is_open()) {
+			level++;
+			frame = 0;
+			directory = "replays/replay" + to_string(currentReplay) + "/l" + to_string(level) + "f" + to_string(frame) + ".jpg";
+			file.open(directory);
+		}
+	}
+	file.close();
+}
+
+void chargeReplay(int replay){
+
+	int currentFrame = 0;
+
+	ifstream file;
+
+	for (int i = 1; i <= 5; i++) {
+		string directory = "replays/replay" + to_string(replay) + "/l" + to_string(i) + "f" + to_string(currentFrame) + ".jpg";
+		file.open(directory);
+		while (file.is_open()) {
+			file.close();
+			Texture frame;
+			frame.loadFromFile(directory);
+			Replay.push_back(frame);
+			directory = "replays/replay" + to_string(replay) + "/l" + to_string(i) + "f" + to_string(currentFrame) + ".jpg";
+			file.open(directory);
+			currentFrame++;
+		}
+		currentFrame = 0;
+	}
+}
+
+void loadingRecordScreen(){
+
+	gameWindow.draw(fontImage);
+	Text loading;
+	loading.setFont(buttonFont);
+	loading.setFillColor(Color::White);
+	loading.setCharacterSize(60);
+	loading.setString("Cargando...");
+	loading.setPosition(178, 250);
+	gameWindow.draw(loading);
+	gameWindow.display();
+}
+
+void gameWinned(){
+
+	bool finish = false;
+	playerMoved = false;
+	int n = 0;
+
+	Text winGame1;
+	winGame1.setFont(gameFont);
+	winGame1.setCharacterSize(55);
+	winGame1.setFillColor(Color::White);
+	winGame1.setOutlineThickness(5);
+	winGame1.setOutlineColor(Color(68, 64, 36));
+	winGame1.setString("Juego");
+	winGame1.setPosition(175, 200);
+	Text winGame2;
+	winGame2.setFont(gameFont);
+	winGame2.setCharacterSize(55);
+	winGame2.setFillColor(Color::White);
+	winGame2.setOutlineThickness(5);
+	winGame2.setOutlineColor(Color(68, 64, 36));
+	winGame2.setString("Terminado");
+	winGame2.setPosition(66, 300);
+
+	while (!finish && gameWindow.isOpen()) {
+		refreshLevel(0, n);
+
+		if (Keyboard::isKeyPressed(Keyboard::Enter)) {
+			finish = true;
+			isEnter = true;
+		}
+		gameWindow.draw(winGame1);
+		gameWindow.draw(winGame2);
+		gameWindow.display();
+		loopRefresh();
 	}
 }
 

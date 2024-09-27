@@ -42,8 +42,8 @@ public:
 	char getStruct(int, int);
 	bool checkBoxPlaces();
 	void loadLevel(int);
-	void loadSavedLevel(int&);
-	void saveLevel(int);
+	void loadSavedLevel(int&, int&, int&);
+	void saveLevel(int, int, int);
 	void movePlayer(char);
 	void printList();
 	void setBoxPlaceState(int, int, bool);

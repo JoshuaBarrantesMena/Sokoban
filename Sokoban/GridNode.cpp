@@ -215,8 +215,8 @@ void GridNode::loadLevel(int levelIndex) {
 	string text;
 	level.open("levels/l" + to_string(levelIndex) + ".txt", ios::in);
 
-	if (level.fail()){
-		exit(1);
+	if (level.fail()){ //level doesn't exist
+		return;
 	}
 	node* auxNode1 = head;
 	node* auxNode2 = head;
@@ -244,7 +244,7 @@ void GridNode::loadLevel(int levelIndex) {
 	remove("levels/sl.txt");
 }
 
-void GridNode::loadSavedLevel(int& currentLevel){
+void GridNode::loadSavedLevel(int& currentLevel, int& currentReplay, int& currentFrame){
 
 	clear();
 
@@ -264,6 +264,10 @@ void GridNode::loadSavedLevel(int& currentLevel){
 
 	getline(level, text);
 	currentLevel = stoi(text);
+	getline(level, text);
+	currentReplay = stoi(text);
+	getline(level, text);
+	currentFrame = stoi(text);
 	while (!level.eof()) {
 
 		getline(level, text);
@@ -288,10 +292,12 @@ void GridNode::loadSavedLevel(int& currentLevel){
 	level.close();
 }
 
-void GridNode::saveLevel(int level){
+void GridNode::saveLevel(int level, int currentReplay, int currentFrame){
 	
 	ofstream save("levels/sl.txt");
 	save << to_string(level) + "\n";
+	save << to_string(currentReplay) + "\n";
+	save << to_string(currentFrame) + "\n";
 
 	node* currentNode = head;
 	node* auxNode = head;
